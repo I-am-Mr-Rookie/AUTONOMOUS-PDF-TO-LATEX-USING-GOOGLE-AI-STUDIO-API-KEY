@@ -94,7 +94,7 @@ _DEFAULT_CHAIN = [
               daily_limit=20, rpm=5, ctx_in=1_048_576, ctx_out=65_536,
               supports_thinking=True, supports_system_instruction=True,
               supports_response_schema=True, supports_media_resolution=True),
-    ModelSpec("Gemma 4 31B", "gemma-2-27b-it",
+    ModelSpec("Gemma 4 31B", "gemma-4-31b-it",
               daily_limit=14400, rpm=30, ctx_in=262_144, ctx_out=32_768,
               supports_thinking=False, supports_system_instruction=False,
               supports_response_schema=False, supports_media_resolution=False),

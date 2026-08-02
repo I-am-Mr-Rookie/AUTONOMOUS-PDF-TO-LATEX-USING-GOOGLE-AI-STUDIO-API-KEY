@@ -40,7 +40,7 @@ riding one model to its daily ceiling and stopping, the pipeline defines an orde
 |:-----:|-------|:------------:|:------------:|:-------------------|
 | 1 | `gemini-3.6-flash` | 20 | 5 | 1,048,576 / 65,536 |
 | 2 | `gemini-3.5-flash` | 20 | 5 | 1,048,576 / 65,536 |
-| 3 | `gemma-2-27b-it` | 14,400 | 30 | 262,144 / 32,768 |
+| 3 | `gemma-4-31b-it` | 14,400 | 30 | 262,144 / 32,768 |
 
 `gemini.generate()` tries tier 1 first. It moves to the next tier when the active model is
 **unavailable** (404/403), **rejects the request** (400), or **hits its limit** — the local ledger
