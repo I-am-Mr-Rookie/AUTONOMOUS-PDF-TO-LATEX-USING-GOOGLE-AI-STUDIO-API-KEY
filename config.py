@@ -87,15 +87,15 @@ class ModelSpec:
 # confirm Gemma accepts any of these, flip the flag here — no other code changes needed.
 _DEFAULT_CHAIN = [
     ModelSpec("Gemini 3.6 Flash", "gemini-3.6-flash",
-              daily_limit=2000, rpm=15, ctx_in=1_048_576, ctx_out=65_536,
+              daily_limit=20, rpm=5, ctx_in=1_048_576, ctx_out=65_536,
               supports_thinking=True, supports_system_instruction=True,
               supports_response_schema=True, supports_media_resolution=True),
     ModelSpec("Gemini 3.5 Flash", "gemini-3.5-flash",
-              daily_limit=2000, rpm=15, ctx_in=1_048_576, ctx_out=65_536,
+              daily_limit=20, rpm=5, ctx_in=1_048_576, ctx_out=65_536,
               supports_thinking=True, supports_system_instruction=True,
               supports_response_schema=True, supports_media_resolution=True),
     ModelSpec("Gemini 3 Flash", "gemini-3-flash-preview",
-              daily_limit=2000, rpm=15, ctx_in=1_048_576, ctx_out=65_536,
+              daily_limit=20, rpm=5, ctx_in=1_048_576, ctx_out=65_536,
               supports_thinking=True, supports_system_instruction=True,
               supports_response_schema=True, supports_media_resolution=True),
     ModelSpec("Gemma 4 31B", "gemma-4-31b-it",
