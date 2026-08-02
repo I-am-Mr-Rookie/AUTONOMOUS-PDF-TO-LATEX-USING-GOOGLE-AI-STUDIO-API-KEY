@@ -1,0 +1,45 @@
+# --- Secrets & Environment Variables ---
+.env
+.env.local
+.env.*.local
+!.env.example
+Code from AI Studio*.py
+
+# --- Python & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Pipeline Runtime Artifacts (Regenerable) ---
+cache/
+output/
+input/*.pdf
+!input/.gitkeep
+!output/.gitkeep
+!cache/.gitkeep
+*.log
+*.tmp
+
+# --- LaTeX Build Leftovers ---
+*.aux
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.bbl
+*.blg

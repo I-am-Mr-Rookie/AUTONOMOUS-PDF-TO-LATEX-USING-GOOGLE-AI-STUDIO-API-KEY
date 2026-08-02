@@ -1,0 +1,56 @@
+SYSTEM INITIALIZATION: AUTONOMOUS PDF-TO-LATEX PIPELINE
+========================================================================
+Role: Principal Systems Architect, Lead Python Developer, and LaTeX Typesetting Expert
+Goal: Build an autonomous, self-correcting, rate-limit-aware PDF-to-LaTeX processing pipeline.
+We are starting a fresh development session. Below is the complete, finalized specification of the system architecture, constraints, directory standards, and execution blueprint. Acknowledge this context, perform a logical validation of the architecture, and outline your immediate file drafting sequence.
+🚀 1. The Core Engineering Challenge
+We need to take a scanned, non-OCR, multi-page (e.g., 20 pages) PDF exam paper (located in input/[Original_Name].pdf) that contains handwritten/printed math and complex diagrams, and transform it into a publication-quality typeset LaTeX PDF output (output/[Original_Name]_LaTeX_compiled.pdf) with high-resolution extracted figures embedded.
+The Absolute Google AI Studio Free Tier Bottleneck (Gemini 3.5 Flash)
+•	Daily Request Limit: 19 Requests per 24 hours (strict ceiling).
+•	Rate Limits: 5 Requests per minute (RPM) / 250K Input Tokens per minute (TPM).
+•	Architectural Solution: A "Cache-First Local Slicing State Machine." The pipeline must log every milestone in a persistent cache/[Original_Name]_state.json file. If a subsequent step (such as local compilation) fails, the program must resume from the cache state instead of repeating previous API transactions.
+📂 2. File & Directory Directory Architecture
+The codebase must preserve the original filename throughout all pipeline directories:
+pdf-to-latex-pipeline/
+├── input/
+│   └── [Original_Name].pdf             # User's source file (dynamic name)
+├── output/
+│   ├── [Original_Name]_LaTeX_compiled.tex # Final compiled LaTeX source
+│   └── [Original_Name]_LaTeX_compiled.pdf # Compiled typeset PDF document
+├── cache/
+│   ├── [Original_Name]_state.json      # Persistent cache state for this specific file
+│   └── images/                         # Offline cropped high-resolution diagrams
+│       ├── [Original_Name]_page_1_q_Q1a_pos_1.png
+│       └── [Original_Name]_page_4_q_Q3b_pos_2.png
+├── preflight.py                        # Hardware & binary checks + auto-installer
+├── extractor.py                        # PDF Scan & Coordinate Mapping (Gemini File API)
+├── processor.py                        # Offline Image Cropping (300 DPI PIL)
+├── compiler.py                         # LaTeX generator, compiler & log parser self-corrector
+└── main.py                             # Orchestrator & CLI Runner
+
+⚙️ 3. Multi-Phase Execution Pipeline
+Phase 1: Preflight & Environment Verification (preflight.py)
+•	Check the host platform (Windows, macOS, Linux).
+•	Search the system PATH using shutil.which() for pdflatex (or latexmk) and Poppler binaries (pdftoppm). Prompt user with OS-specific install commands if missing.
+•	Silently run python pip installations for: google-genai, pdf2image, pillow, pypdf, python-dotenv.
+•	Authenticate and validate the Gemini API key. Store keys and paths in a secure config file.
+Phase 2: PDF Scan & Coordinate Extraction (extractor.py)
+•	Read source file name from input/. Check if cache/[Original_Name]_state.json already contains "extraction_result". If it does, skip this phase!
+•	If uncached, upload the source PDF to Google Files API (client.files.upload()).
+•	Query gemini-3.5-flash using a strict JSON output schema. In ONE single request, map the layout of all 20 pages. Extract questions, raw text, and relative bounding boxes [ymin, xmin, ymax, xmax] for any diagrams.
+•	Throttle execution with a 12-second delay before/after the call to avoid RPM limits.
+•	Save result to cache/[Original_Name]_state.json.
+Phase 3: Offline Lossless Slicing (processor.py)
+•	Run entirely offline (Consumes 0 API requests).
+•	Read the cached bounding boxes. Convert the target PDF pages to high-resolution (300 DPI) PIL images in-memory via pdf2image.
+•	Crop diagrams losslessly and save to cache/images/ using the original filename layout.
+Phase 4: LaTeX Compilation & Self-Correction (compiler.py)
+•	Pass structured text and diagram image paths to Gemini to generate the initial LaTeX code. Standardize math notations:
+
+$$Z(s) = \frac{V(s)}{I(s)}$$
+•	Compile locally: pdflatex -interaction=nonstopmode -output-directory=output output/[Original_Name]_LaTeX_compiled.tex.
+•	Parse compilation logs. If failures are found, extract the log error, send only the broken snippet back to Gemini, patch the file, and re-compile (Max 3 correction loops).
+🛠️ Your Instructions For Initial Response:
+1.	Verify the logical coherence of this system architecture. Point out any structural risks (such as specific LaTeX packages or file permission issues on Windows vs. Linux) that we must preemptively mitigate.
+2.	Outline the step-by-step implementation strategy you will follow to build, test, and assemble these files.
+3.	State that you are ready to begin writing preflight.py.
