@@ -2,7 +2,7 @@
 
 Confirms the host can actually run the pipeline before any API budget is spent:
 pip-installs any missing Python packages and locates the external binaries
-pdflatex/latexmk and Poppler's pdftoppm (printing OS-specific install hints if
+pdflatex and Poppler's pdftoppm/pdftotext (printing OS-specific install hints if
 absent). The Gemini API key is NOT handled here — it is requested at runtime by
 main.py after preflight passes, and never stored.
 """
@@ -28,6 +28,7 @@ _INSTALL_HINTS = {
         "Linux": "sudo apt-get install poppler-utils",
     },
 }
+_INSTALL_HINTS["pdftotext"] = _INSTALL_HINTS["pdftoppm"]  # both ship with Poppler
 
 
 def _install_missing_packages() -> bool:
@@ -81,12 +82,11 @@ def run() -> bool:
     ensure_dirs()
     has_deps = _install_missing_packages()
 
-    # pdflatex OR latexmk is sufficient for compilation.
-    has_tex = _check_binary("pdflatex")
-    has_tex = _check_binary("latexmk") or has_tex
+    has_tex = _check_binary("pdflatex")  # compiler.py invokes pdflatex directly
     has_poppler = _check_binary("pdftoppm")  # required by pdf2image for rasterizing
+    has_pdftotext = _check_binary("pdftotext")  # required by evaluator.py (Phase 5)
 
-    ok = has_deps and has_tex and has_poppler
+    ok = has_deps and has_tex and has_poppler and has_pdftotext
     print("✓ Preflight passed.\n" if ok else "✗ Preflight found blocking issues (see above).\n")
     return ok
 

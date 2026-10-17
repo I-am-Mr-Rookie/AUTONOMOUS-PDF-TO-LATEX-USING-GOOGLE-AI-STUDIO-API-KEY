@@ -7,13 +7,14 @@ during the generation or error-correction loop.
 """
 from __future__ import annotations
 
-import subprocess
-import shutil
 import re
+import shutil
+import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from config import OUTPUT_DIR, ROOT
+from config import OUTPUT_DIR
 from state import load_state, save_state
 
 EVAL_KEY = "semantic_evaluation"
@@ -67,16 +68,9 @@ def run(original_pdf: Path, original_name: str, force: bool = False) -> dict[str
 
     # A simple but strict coverage metric. How much of the original alphanumerics 
     # exist in the compiled doc in any order? (LaTeX might reorder elements like marks).
-    orig_chars = list(orig_text)
-    comp_chars = list(comp_text)
-    
-    matched = 0
-    for c in orig_chars:
-        if c in comp_chars:
-            matched += 1
-            comp_chars.remove(c)
-            
-    score = matched / len(orig_chars) if orig_chars else 1.0
+    # Multiset intersection: O(n), same result as removing each matched char one by one.
+    matched = sum((Counter(orig_text) & Counter(comp_text)).values())
+    score = matched / len(orig_text)
     
     # Require at least 85% character retention. 
     # (LaTeX strips some OCR junk, so 100% is unrealistic for scanned docs).

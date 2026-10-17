@@ -19,6 +19,10 @@ from config import MAX_CORRECTION_LOOPS, OUTPUT_DIR, ROOT
 from state import load_state, save_state
 
 LATEX_KEY = "compilation"
+# Overfull boxes wider than this send the doc back for correction; smaller ones are
+# cosmetic and not worth a scarce free-tier request.
+OVERFULL_LIMIT_PT = 10.0
+_OVERFULL_RE = re.compile(r"Overfull \\hbox \(([\d.]+)pt too wide\)")
 
 SYSTEM = (
     "You are a LaTeX typesetting expert. Output ONLY compilable LaTeX source for "
@@ -91,11 +95,8 @@ def _compile(tex_path: Path) -> tuple[bool, str]:
     log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
     pdf_path = OUTPUT_DIR / (tex_path.stem + ".pdf")
     ok = proc.returncode == 0 and pdf_path.exists()
-    
-    # Treat Overfull \hbox as a failure if it's significant (e.g., more than a few pts, or just generally)
-    if ok and "Overfull \\hbox" in log_text:
+    if ok and any(float(pt) > OVERFULL_LIMIT_PT for pt in _OVERFULL_RE.findall(log_text)):
         ok = False
-        
     return ok, (log_text or proc.stdout or proc.stderr)
 
 
@@ -129,6 +130,10 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> dict[str, An
         print("→ Phase 4: generating initial LaTeX (1 API request)…")
         resp = gemini.generate(_gen_prompt(extraction, crops), system_instruction=SYSTEM)
         tex_path.write_text(_clean(resp.text), encoding="utf-8")
+        # Record now so a crash before the compile loop ends doesn't re-spend this request.
+        state[LATEX_KEY] = {"success": False, "attempts": 0, "generated": True,
+                            "tex": str(tex_path), "pdf": None}
+        save_state(original_name, state)
     else:
         print("→ Phase 4: reusing cached .tex; recompiling…")
 

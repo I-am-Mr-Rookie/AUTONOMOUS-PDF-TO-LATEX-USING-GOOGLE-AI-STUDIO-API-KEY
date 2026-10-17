@@ -3,7 +3,7 @@
 Centralizing all access here makes the free-tier guarantees enforceable in one
 place. The headline feature is a three-tier model FALLBACK CHAIN (config.MODEL_CHAIN):
 
-    Gemini 3.5 Flash  →  Gemini 3 Flash  →  Gemma 4 31B
+    Gemini 3.6 Flash  →  Gemini 3.5 Flash  →  Gemma 4 31B
 
 `generate()` tries each model in order. It moves to the next model when the active
 one is unavailable (404/403), is rejected for that model (400), or hits its limit —
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,8 +42,6 @@ from config import (
 
 _client = None
 _api_key: str | None = None
-_api_keys: list[str] = []
-_key_index: int = 0
 _last_call_monotonic: dict[str, float] = {}  # per-model request spacing (RPM guard)
 _active_model: ModelSpec | None = None        # the model that answered the last generate()
 
@@ -197,7 +196,10 @@ def _record_request(model_id: str) -> None:
         if not ledger[key] and key != fp:
             del ledger[key]
     USAGE_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-    USAGE_LEDGER.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+    # Write-then-rename: a torn ledger would parse as {} and silently reset the budget.
+    tmp = USAGE_LEDGER.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+    os.replace(tmp, USAGE_LEDGER)
 
 
 def _throttle(spec: ModelSpec) -> None:

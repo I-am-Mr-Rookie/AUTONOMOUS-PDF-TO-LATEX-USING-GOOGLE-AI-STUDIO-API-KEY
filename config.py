@@ -34,7 +34,7 @@ def _load_env_file() -> None:
     if env_file.exists():
         try:
             from dotenv import load_dotenv
-            load_dotenv(env_file, override=True)
+            load_dotenv(env_file, override=False)  # a shell-exported var wins over .env
         except ImportError:
             for line in env_file.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
@@ -43,7 +43,7 @@ def _load_env_file() -> None:
                     key = k.strip()
                     val = v.strip().strip("'\"")
                     if val:
-                        os.environ[key] = val
+                        os.environ.setdefault(key, val)
 
 _load_env_file()
 
@@ -116,7 +116,7 @@ else:
 
 # Per-model attempts on rate/transient errors before falling back to the next model
 # ("switch after 2-3 attempts"). A per-day quota (daily 429) switches immediately.
-MAX_MODEL_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "3"))
+MAX_MODEL_ATTEMPTS = max(1, int(os.getenv("GEMINI_MAX_ATTEMPTS", "3") or 3))  # 0 would skip every call
 MAX_CORRECTION_LOOPS = 3   # compiler self-correction attempts after the first compile
 
 # --- Rendering / model knobs (max accuracy; applied only when the model supports them) ---

@@ -21,7 +21,7 @@ The work is split into five phases. Only two of them ever touch the network.
 
 | Phase | Module | API calls | What it does |
 |------:|--------|:---------:|--------------|
-| 1 | `preflight.py` | 0 | Detects the OS, installs missing Python deps, and locates `pdflatex`/`latexmk` and Poppler's `pdftoppm` (prints OS-specific install hints if absent). |
+| 1 | `preflight.py` | 0 | Detects the OS, installs missing Python deps, and locates `pdflatex` and Poppler's `pdftoppm`/`pdftotext` (prints OS-specific install hints if absent). |
 | 2 | `extractor.py` | 1 | Uploads the PDF once and, in a **single** structured-JSON request, maps the whole paper: header, sections, questions, marks, OR-alternatives, and `[ymin, xmin, ymax, xmax]` bounding boxes for every diagram. |
 | 3 | `processor.py` | 0 | **Offline.** Renders the needed pages at 300 DPI and crops each diagram losslessly into `cache/images/`. |
 | 4 | `compiler.py` | 1 + up to 3 | Generates the `.tex` from the cached structure + cropped images, compiles with `pdflatex`, and on failure feeds the parsed log errors **plus the full current source** back to the model for a corrected document — up to 3 correction loops. |
@@ -59,8 +59,8 @@ automatically and never needs to know which model answered.
 ## Requirements
 
 - **Python 3.10+**
-- **A LaTeX engine** — `pdflatex` (or `latexmk`), e.g. from MiKTeX or TeX Live.
-- **Poppler** — provides `pdftoppm`, which `pdf2image` needs to rasterize pages.
+- **A LaTeX engine** — `pdflatex`, e.g. from MiKTeX or TeX Live.
+- **Poppler** — provides `pdftoppm` (used by `pdf2image` to rasterize pages) and `pdftotext` (used by the Phase 5 evaluator).
 - **A Google AI Studio API key** — free tier is enough. Get one at <https://aistudio.google.com/apikey>.
 
 Python packages (`google-genai`, `pdf2image`, `pillow`, `pypdf`) are listed in `requirements.txt`
@@ -99,7 +99,7 @@ The API key can be provided via a `.env` file, an environment variable, or inter
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY=your_gemini_api_key_here
 
-# Option B — Environment variable
+# Option B — Environment variable (takes precedence over .env)
 export GEMINI_API_KEY="your-key-here"
 
 # Option C — Interactive prompt
@@ -133,8 +133,8 @@ python main.py --skip-preflight
 # Just verify the environment, then exit (no API calls)
 python main.py --preflight-only
 
-# Run the batch stress test on all PDFs in input/ directory
-python batch_stress_runner.py
+# Offline self-check of environment + parsing helpers (no generate requests)
+python stress_eval_loop.py
 ```
 
 ---
@@ -154,8 +154,8 @@ AUTONOMOUS PDF-TO-LATEX/
     ├── Exam_state.json                       # resumable state for this file
     ├── api_usage.json                        # per-key, per-model 24 h request ledger
     └── images/
-        ├── Exam_page_1_q_Q1a_pos_1.png       # losslessly cropped diagrams
-        └── Exam_page_4_q_Q3b_pos_2.png
+        ├── Exam_page_1_q_B3_alt_0_pos_1.png  # losslessly cropped diagrams
+        └── Exam_page_4_q_B17_alt_0_pos_2.png #   (B<n> = index of the owning block)
 ```
 
 ## Caching & resumption
@@ -171,13 +171,13 @@ where it left off and **never repeats a completed API transaction**. Use `--forc
 
 | File | Role |
 |------|------|
-| `main.py` | Orchestrator / CLI. Sequences the four phases with cache-resume. |
+| `main.py` | Orchestrator / CLI. Sequences the phases with cache-resume. |
 | `preflight.py` | Phase 1 — environment verification + dependency bootstrap. |
 | `extractor.py` | Phase 2 — uploads the PDF and extracts the full layout as structured JSON. |
 | `processor.py` | Phase 3 — offline 300 DPI rendering + lossless diagram cropping. |
 | `compiler.py` | Phase 4 — LaTeX generation, `pdflatex` compilation, log-driven self-correction. |
 | `evaluator.py` | Phase 5 — Offline semantic fidelity evaluation to prevent text deletion. |
-| `batch_stress_runner.py` | Orchestrator for batch evaluating multiple PDFs and rotating API keys. |
+| `stress_eval_loop.py` | Offline rubric self-check of the environment and helper functions (runs preflight; makes no generate requests). |
 | `gemini.py` | The single chokepoint for all API access: client, per-model throttle, fallback chain, and the usage ledger. |
 | `config.py` | Paths, the `MODEL_CHAIN` spec + per-model limits, and UTF-8 console setup. |
 | `state.py` | Atomic per-file cache state machine. |
@@ -207,6 +207,6 @@ where it left off and **never repeats a completed API transaction**. Use `--forc
   are discovered at runtime (never hard-coded) and all paths are built with `pathlib`.
 - The live `generate` calls are the only paths that spend budget; everything else (preflight,
   slicing, compilation) is free and can be exercised offline.
-- Tune behavior via environment variables: `GEMINI_MODEL` pins the chain to a single model,
+- Tune behavior via environment variables: `GEMINI_MODEL` pins the chain to a single model (disables fallback),
   `GEMINI_MAX_ATTEMPTS` sets the per-model retry count, `GEMINI_MEDIA_RESOLUTION` / `GEMINI_THINKING_LEVEL`
   override the quality knobs.

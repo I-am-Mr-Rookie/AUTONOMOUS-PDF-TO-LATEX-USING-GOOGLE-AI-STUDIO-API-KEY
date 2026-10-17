@@ -5,11 +5,8 @@ totaling 100.0 points.
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
-import tempfile
-import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -18,12 +15,10 @@ if str(ROOT) not in sys.path:
 
 import config
 import gemini
-import state
 import preflight
 import extractor
 import processor
 import compiler
-import main
 
 class RubricEvaluator:
     def __init__(self):
@@ -64,11 +59,11 @@ def evaluate_all() -> tuple[float, dict[str, dict]]:
     except Exception as e:
         r2_checks.append((False, f"preflight exception: {e}"))
 
-    has_tex = preflight._check_binary("pdflatex") or preflight._check_binary("latexmk")
-    has_poppler = preflight._check_binary("pdftoppm")
+    has_tex = preflight._check_binary("pdflatex")
+    has_poppler = preflight._check_binary("pdftoppm") and preflight._check_binary("pdftotext")
     if has_tex and has_poppler:
         r2_pts += 5.0
-        r2_checks.append((True, "Host binaries pdflatex/latexmk and pdftoppm confirmed on PATH"))
+        r2_checks.append((True, "Host binaries pdflatex, pdftoppm and pdftotext confirmed on PATH"))
     else:
         r2_checks.append((False, "Missing host binary on PATH"))
     evaluator.score_rubric("R2: Preflight & Host Environment", r2_pts, 15.0, r2_checks)
@@ -177,17 +172,20 @@ def evaluate_all() -> tuple[float, dict[str, dict]]:
     else:
         r6_checks.append((False, "Log parser failed"))
 
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     test_tex = config.OUTPUT_DIR / "_rubric_dummy.tex"
     test_tex.write_text("\\documentclass{article}\n\\begin{document}\nOK\n\\end{document}\n", encoding="utf-8")
-    ok_comp, _ = compiler._compile(test_tex)
-    if ok_comp:
-        r6_pts += 10.0
-        r6_checks.append((True, "pdflatex compiled test source into PDF cleanly"))
-        for ext in (".tex", ".pdf", ".aux", ".log"):
-            p = config.OUTPUT_DIR / f"_rubric_dummy{ext}"
-            if p.exists(): p.unlink()
-    else:
-        r6_checks.append((False, "pdflatex dummy compilation failed"))
+    try:
+        ok_comp, _ = compiler._compile(test_tex)
+        if ok_comp:
+            r6_pts += 10.0
+            r6_checks.append((True, "pdflatex compiled test source into PDF cleanly"))
+        else:
+            r6_checks.append((False, "pdflatex dummy compilation failed"))
+    except OSError as e:  # pdflatex missing from PATH
+        r6_checks.append((False, f"pdflatex could not run: {e}"))
+    for ext in (".tex", ".pdf", ".aux", ".log"):
+        (config.OUTPUT_DIR / f"_rubric_dummy{ext}").unlink(missing_ok=True)
     evaluator.score_rubric("R6: LaTeX Generation & Compilation", r6_pts, 20.0, r6_checks)
 
     # Compute Total Score

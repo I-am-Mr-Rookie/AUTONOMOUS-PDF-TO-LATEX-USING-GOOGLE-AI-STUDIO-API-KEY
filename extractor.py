@@ -81,18 +81,27 @@ def _schema():
 
 def _parse_json(raw: str) -> dict[str, Any]:
     raw = (raw or "").strip()
-    if raw.startswith("```"):  # defensive: strip stray markdown fences
+    if not raw.startswith("{"):  # defensive: strip stray fences/prose (schema-less models)
         start, end = raw.find("{"), raw.rfind("}")
         if start != -1 and end != -1:
             raw = raw[start : end + 1]
-    return json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Model did not return valid JSON for the extraction: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("blocks"), list):
+        raise RuntimeError("Extraction JSON is missing the required `blocks` array.")
+    return data
 
 
 def iter_diagrams(result: dict[str, Any]):
     """Yield (block_id, diagram_index, diagram) across the whole document."""
-    for bi, block in enumerate(result.get("blocks", [])):
-        for di, d in enumerate(block.get("diagrams", [])):
-            yield f"B{bi}", di, d
+    for bi, block in enumerate(result.get("blocks") or []):
+        if not isinstance(block, dict):
+            continue
+        for di, d in enumerate(block.get("diagrams") or []):
+            if isinstance(d, dict):
+                yield f"B{bi}", di, d
 
 
 def run(pdf_path: Path, original_name: str, force: bool = False) -> dict[str, Any]:

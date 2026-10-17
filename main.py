@@ -1,6 +1,6 @@
 """Orchestrator / CLI runner for the autonomous PDF -> LaTeX pipeline.
 
-Sequences the four phases, each independently resumable from the per-file cache.
+Sequences the pipeline phases, each independently resumable from the per-file cache.
 Safe to re-run: completed phases are skipped, so a crash, a failed compile, or a
 hit free-tier ceiling never costs a repeated API request.
 
@@ -20,6 +20,7 @@ from pathlib import Path
 
 import compiler
 import config
+import evaluator
 import extractor
 import gemini
 import preflight
@@ -30,7 +31,8 @@ def _obtain_api_key() -> str:
     """Get the Google AI Studio key without persisting it anywhere.
 
     Non-interactive runs may pass it via the GEMINI_API_KEY environment variable
-    (not a file); otherwise we prompt without echo. The key lives only in memory.
+    (or a gitignored .env, loaded by config); otherwise we prompt without echo.
+    The pipeline itself never writes the key anywhere.
     """
     env_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if env_key:
@@ -98,7 +100,6 @@ def main() -> None:
         processor.run(pdf_path, original_name, force=args.force)   # Phase 3 (0 requests)
         result = compiler.run(pdf_path, original_name, force=args.force)  # Phase 4 (<=1+3 requests)
         if result.get("success"):
-            import evaluator
             eval_result = evaluator.run(pdf_path, original_name, force=args.force)
             if not eval_result.get("success"):
                 print(f"\n⚠ WARNING: Semantic Evaluation Failed (Score: {eval_result.get('score', 0.0):.1%}). Hallucination risk detected!")

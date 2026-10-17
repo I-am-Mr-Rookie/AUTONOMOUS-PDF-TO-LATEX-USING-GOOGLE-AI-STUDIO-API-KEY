@@ -11,6 +11,7 @@ orphaned images behind.
 """
 from __future__ import annotations
 
+import glob
 import shutil
 from pathlib import Path
 from typing import Any
@@ -37,7 +38,7 @@ def _safe(s: Any) -> str:
 def _purge_existing(original_name: str) -> int:
     """Delete crops left by a prior run of this file (keeps cache/images/ clean)."""
     removed = 0
-    for old in IMAGES_DIR.glob(f"{original_name}_page_*.png"):
+    for old in IMAGES_DIR.glob(f"{glob.escape(original_name)}_page_*.png"):
         try:
             old.unlink()
             removed += 1
@@ -67,7 +68,10 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> list[dict[st
     # Group diagrams by page so each page is rendered at most once.
     by_page: dict[int, list[tuple[str, int, dict[str, Any]]]] = {}
     for qid, ai, d in iter_diagrams(extraction):
-        pno = int(d.get("page", 0) or 0)
+        try:
+            pno = int(d.get("page") or 0)
+        except (TypeError, ValueError):
+            pno = 0
         if pno >= 1:
             by_page.setdefault(pno, []).append((qid, ai, d))
 
@@ -84,12 +88,12 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> list[dict[st
         width, height = img.size
 
         for qid, ai, d in by_page[pno]:
-            pos = int(d.get("position", len(crops) + 1))
-            box = d.get("box_2d") or []
-            if len(box) != 4:
-                print(f"  ! page {pno} {qid}: bad box {box}; skipping.")
+            try:
+                pos = int(d.get("position") or len(crops) + 1)
+                ymin, xmin, ymax, xmax = (float(v) for v in d.get("box_2d") or [])
+            except (TypeError, ValueError):
+                print(f"  ! page {pno} {qid}: bad box/position {d.get('box_2d')}; skipping.")
                 continue
-            ymin, xmin, ymax, xmax = box
             raw_left = min(xmin, xmax) / 1000 * width
             raw_right = max(xmin, xmax) / 1000 * width
             raw_top = min(ymin, ymax) / 1000 * height
@@ -105,7 +109,7 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> list[dict[st
             top = max(0, int(raw_top - pad_y))
             bottom = min(height, int(raw_bottom + pad_y))
             if right - left < 2 or bottom - top < 2:
-                print(f"  ! page {pno} {qid}: degenerate box {box}; skipping.")
+                print(f"  ! page {pno} {qid}: degenerate box {d.get("box_2d")}; skipping.")
                 continue
 
             fname = f"{original_name}_page_{pno}_q_{_safe(qid)}_alt_{ai}_pos_{pos}.png"
