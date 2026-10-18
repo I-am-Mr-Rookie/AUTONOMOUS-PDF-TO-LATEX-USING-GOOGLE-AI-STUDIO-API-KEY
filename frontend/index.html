@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF → LaTeX</title>
+<style>
+  :root {
+    --paper: #f7f4ee; --card: #fffdf9; --ink: #1f1d1a; --muted: #6b655c;
+    --rule: #ddd6ca; --accent: #1f6f5c; --accent-ink: #fff; --ok: #1f7a3a; --bad: #b42318;
+    --serif: "Crimson Pro", "Libre Baskerville", Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "Source Code Pro", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #15140f; --card: #1d1b16; --ink: #ece7dd; --muted: #a39b8d;
+            --rule: #38342c; --accent: #5cc4a6; --accent-ink: #0d1a16; --ok: #6fd08c; --bad: #ff7a6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--sans); }
+  header, main { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  header { padding-top: 40px; padding-bottom: 24px; border-bottom: 1px solid var(--rule); }
+  h1 { font: 600 2.5rem/1.1 var(--serif); margin: 0 0 .75em; }
+  h1 + p { margin: 0; color: var(--muted); max-width: 62ch; }
+  h2 { font: 600 1.35rem/1.2 var(--serif); margin: 0 0 12px; }
+  h2 span { font: 500 .75rem var(--mono); color: var(--muted); margin-right: .5em; }
+  main { display: grid; gap: 24px; padding-top: 24px; padding-bottom: 48px;
+         grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } h1 { font-size: 2rem; } }
+  section { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 20px; }
+  .col { display: grid; gap: 24px; align-content: start; }
+  .muted { color: var(--muted); font-size: .9rem; }
+
+  .drop { display: block; border: 1.5px dashed var(--rule); border-radius: 6px; padding: 22px;
+          text-align: center; cursor: pointer; color: var(--muted); }
+  .drop strong { color: var(--accent); }
+  .drop.over, .drop:focus-within { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+
+  fieldset { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+  legend { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+  .files { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  .files li { border-bottom: 1px solid var(--rule); }
+  .files label { display: flex; gap: 10px; align-items: center; padding: 10px 4px; cursor: pointer; }
+  .files .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .tag { font: 500 .72rem var(--mono); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+  .tag.ok { color: var(--ok); border-color: currentColor; }
+
+  .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .field label { font-size: .9rem; font-weight: 600; }
+  input[type=password] { font: inherit; padding: 9px 11px; border: 1px solid var(--rule); border-radius: 6px;
+                         background: var(--paper); color: var(--ink); width: 100%; }
+  .check { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 18px; font-size: .95rem; }
+  .check input { margin-top: 4px; accent-color: var(--accent); }
+  input[type=radio] { accent-color: var(--accent); }
+  button { font: 600 1rem var(--sans); padding: 11px 18px; border-radius: 6px; cursor: pointer;
+           border: 1px solid var(--ink); background: var(--accent); color: var(--accent-ink);
+           box-shadow: 3px 3px 0 var(--ink); transition: transform 120ms ease-out, box-shadow 120ms ease-out; }
+  button:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .phases { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 16px; padding: 0; }
+  @media (max-width: 520px) { .phases { grid-template-columns: repeat(2, 1fr); } }
+  .phases li { border-top: 3px solid var(--rule); padding-top: 6px; font-size: .85rem; }
+  .phases b { display: block; font: 500 .72rem var(--mono); color: var(--muted); }
+  .phases [data-s=active] { border-color: var(--accent); }
+  .phases [data-s=done] { border-color: var(--ok); }
+  .phases [data-s=failed] { border-color: var(--bad); }
+  .phases [data-s=active] b::after { content: " · running"; color: var(--accent); }
+  .phases [data-s=done] b::after { content: " · done"; color: var(--ok); }
+  .phases [data-s=failed] b::after { content: " · failed"; color: var(--bad); }
+
+  pre { margin: 0; font: 13px/1.55 var(--mono); background: var(--paper); border: 1px solid var(--rule);
+        border-radius: 6px; padding: 12px 14px; height: 380px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .status { min-height: 1.5em; margin: 12px 0 0; font-weight: 600; }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+  .links a { color: var(--accent); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scanned PDF → typeset LaTeX</h1>
+  <p>Upload a scanned exam paper, run the five-phase pipeline, and download the compiled PDF.
+     Completed phases are cached, so re-running never re-spends an API request.</p>
+</header>
+
+<main>
+  <div class="col">
+    <section aria-labelledby="src-h">
+      <h2 id="src-h"><span>01</span>Source PDF</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="upload" accept="application/pdf,.pdf" multiple>
+        <strong>Choose a PDF</strong> or drop it here
+        <div class="muted">Saved to <code>input/</code></div>
+      </label>
+      <fieldset>
+        <legend>PDFs in <code>input/</code></legend>
+        <ul class="files" id="files"></ul>
+        <p class="muted" id="no-files" hidden>No PDFs yet — upload one above.</p>
+      </fieldset>
+    </section>
+
+    <section aria-labelledby="run-h">
+      <h2 id="run-h"><span>02</span>Run</h2>
+      <form id="run-form">
+        <div class="field">
+          <label for="key">Google AI Studio API key</label>
+          <input type="password" id="key" autocomplete="off" spellcheck="false" aria-describedby="key-help">
+          <span class="muted" id="key-help">Optional if <code>GEMINI_API_KEY</code> is set or in <code>.env</code>. Passed only to the pipeline process, never stored.</span>
+        </div>
+        <label class="check"><input type="checkbox" id="force"> <span>Ignore cache and re-run every phase <span class="muted">(spends API budget again)</span></span></label>
+        <button type="submit" id="run-btn">Run pipeline</button>
+      </form>
+    </section>
+  </div>
+
+  <section aria-labelledby="prog-h">
+    <h2 id="prog-h"><span>03</span>Progress</h2>
+    <ol class="phases" id="phases">
+      <li data-p="1"><b>Phase 1</b>Preflight</li>
+      <li data-p="2"><b>Phase 2</b>Extract</li>
+      <li data-p="3"><b>Phase 3</b>Crop</li>
+      <li data-p="4"><b>Phase 4</b>Compile</li>
+      <li data-p="5"><b>Phase 5</b>Evaluate</li>
+    </ol>
+    <pre id="log" tabindex="0" aria-label="Pipeline log">Pick a PDF and press “Run pipeline”.</pre>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <div class="links" id="links"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let selected = null, offset = 0, logText = "", polling = false;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function setStatus(msg, kind = "") { $("status").textContent = msg; $("status").className = "status " + kind; }
+
+function outputLinks(f) {
+  const box = $("links"); box.replaceChildren();
+  if (!f) return;
+  for (const [key, label] of [["pdf", "Open compiled PDF"], ["tex", "View .tex source"]]) {
+    if (!f[key]) continue;
+    const a = document.createElement("a");
+    a.href = "/output/" + encodeURIComponent(f[key]); a.target = "_blank"; a.rel = "noopener";
+    a.textContent = label; box.append(a);
+  }
+}
+
+async function loadFiles() {
+  const files = await api("/api/files");
+  const list = $("files"); list.replaceChildren();
+  $("no-files").hidden = files.length > 0;
+  if (!files.some((f) => f.name === selected)) selected = files[0]?.name ?? null;
+  for (const f of files) {
+    const li = document.createElement("li"), label = document.createElement("label");
+    const radio = Object.assign(document.createElement("input"), { type: "radio", name: "file", value: f.name, checked: f.name === selected });
+    radio.onchange = () => { selected = f.name; outputLinks(f); };
+    const name = Object.assign(document.createElement("span"), { className: "name", textContent: f.name });
+    const tag = Object.assign(document.createElement("span"), { className: "tag" + (f.pdf ? " ok" : ""),
+      textContent: f.pdf ? "compiled" : (f.size / 1048576).toFixed(1) + " MB" });
+    label.append(radio, name, tag); li.append(label); list.append(li);
+  }
+  outputLinks(files.find((f) => f.name === selected));
+  return files;
+}
+
+async function upload(fileList) {
+  for (const file of fileList) {
+    if (!/\.pdf$/i.test(file.name)) { setStatus(`${file.name}: only PDFs are accepted.`, "bad"); continue; }
+    setStatus(`Uploading ${file.name}…`);
+    try {
+      const { name } = await api("/api/upload?name=" + encodeURIComponent(file.name), { method: "POST", body: file });
+      selected = name; setStatus(`Uploaded ${name}.`, "ok");
+    } catch (e) { setStatus(`Upload failed: ${e.message}`, "bad"); }
+  }
+  await loadFiles();
+}
+
+function updatePhases(text, finished, code) {
+  const state = {};
+  if (/Preflight passed/.test(text)) state[1] = "done";
+  else if (/Preflight found blocking/.test(text)) state[1] = "failed";
+  else if (text) state[1] = "active";
+  for (const [, mark, n] of text.matchAll(/([→✓✗]) Phase (\d)/g))
+    state[n] = mark === "→" ? "active" : mark === "✓" ? "done" : "failed";
+  // A phase still "running" when the process exits did not finish.
+  if (finished && code !== 0) for (const n in state) if (state[n] === "active") state[n] = "failed";
+  if (finished && code === 0) for (const n in state) if (state[n] === "active") state[n] = "done";
+  for (const li of $("phases").children) li.dataset.s = state[li.dataset.p] || "";
+}
+
+async function poll() {
+  if (polling) return; polling = true;
+  try {
+    while (true) {
+      const job = await api("/api/job?since=" + offset);
+      if (job.log) { logText += job.log; $("log").textContent = logText;
+                     $("log").scrollTop = $("log").scrollHeight; }
+      offset = job.offset;
+      updatePhases(logText, !job.running, job.code);
+      $("run-btn").disabled = job.running;
+      if (!job.running) {
+        if (job.file) {
+          const ok = job.code === 0 && /🎉 Done/.test(logText);
+          setStatus(ok ? `Finished ${job.file}.` : `Run ended without a compiled PDF (exit ${job.code}). See the log.`, ok ? "ok" : "bad");
+          selected = job.file; await loadFiles();
+        }
+        break;
+      }
+      setStatus(`Running ${job.file}…`);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  } catch (e) { setStatus(`Lost contact with the server: ${e.message}`, "bad"); }
+  finally { polling = false; }
+}
+
+$("run-form").onsubmit = async (ev) => {
+  ev.preventDefault();
+  if (!selected) return setStatus("Upload or pick a PDF first.", "bad");
+  try {
+    await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file: selected, force: $("force").checked, api_key: $("key").value }) });
+    offset = 0; logText = ""; $("log").textContent = ""; $("links").replaceChildren();
+    poll();
+  } catch (e) { setStatus(e.message, "bad"); }
+};
+
+$("upload").onchange = (e) => { upload(e.target.files); e.target.value = ""; };
+const drop = $("drop");
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files); };
+
+loadFiles().catch((e) => setStatus(e.message, "bad"));
+poll(); // pick up a run already in progress (e.g. after a page reload)
+</script>
+</body>
+</html>

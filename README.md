@@ -137,6 +137,9 @@ python main.py --preflight-only
 python stress_eval_loop.py
 ```
 
+Prefer a browser? `python frontend/server.py` starts a local UI at <http://127.0.0.1:8000>. It lets
+you upload a PDF, run the pipeline, watch each phase, and open the result. See `FRONTEND_NOTES.md`.
+
 ---
 
 ## Output & file naming
