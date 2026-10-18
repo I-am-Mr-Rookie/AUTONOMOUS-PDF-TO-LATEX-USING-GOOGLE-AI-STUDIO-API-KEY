@@ -109,7 +109,7 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> list[dict[st
             top = max(0, int(raw_top - pad_y))
             bottom = min(height, int(raw_bottom + pad_y))
             if right - left < 2 or bottom - top < 2:
-                print(f"  ! page {pno} {qid}: degenerate box {d.get("box_2d")}; skipping.")
+                print(f"  ! page {pno} {qid}: degenerate box {d.get('box_2d')}; skipping.")
                 continue
 
             fname = f"{original_name}_page_{pno}_q_{_safe(qid)}_alt_{ai}_pos_{pos}.png"

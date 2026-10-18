@@ -121,7 +121,7 @@ Drop your scanned exam paper into `input/`, then run the pipeline:
 # Process the first PDF found in input/
 python main.py
 
-# Pick a specific file (name in input/, or an absolute path)
+# Pick a specific file (a name in input/, or a path)
 python main.py --input Exam.pdf
 
 # Ignore the cache and re-run every phase from scratch
@@ -135,6 +135,15 @@ python main.py --preflight-only
 
 # Offline self-check of environment + parsing helpers (no generate requests)
 python stress_eval_loop.py
+```
+
+### Tests
+
+The automated tests are offline. They need only the Python packages, not the API, pdflatex or Poppler:
+
+```bash
+python -m unittest discover tests            # pipeline modules
+python -m unittest frontend/test_server.py     # local web UI server
 ```
 
 Prefer a browser? `python frontend/server.py` starts a local UI at <http://127.0.0.1:8000>. It lets
@@ -167,6 +176,8 @@ Every milestone is written to `cache/[Original_Name]_state.json`, the single sou
 resumption. Each phase checks it and **skips work already recorded**. So if local compilation fails
 (or you Ctrl-C, or you hit the daily ceiling), just re-run `python main.py` — it picks up exactly
 where it left off and **never repeats a completed API transaction**. Use `--force` to start clean.
+The cache is keyed by filename, but the source PDF's SHA-256 is recorded too: if you replace
+`input/Exam.pdf` with a different file of the same name, the next run notices and starts fresh.
 
 ---
 
@@ -184,6 +195,7 @@ where it left off and **never repeats a completed API transaction**. Use `--forc
 | `gemini.py` | The single chokepoint for all API access: client, per-model throttle, fallback chain, and the usage ledger. |
 | `config.py` | Paths, the `MODEL_CHAIN` spec + per-model limits, and UTF-8 console setup. |
 | `state.py` | Atomic per-file cache state machine. |
+| `tests/` | Offline unit tests (fallback chain, ledger, cropping, compile loop, parsing). |
 
 ---
 

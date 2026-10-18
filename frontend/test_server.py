@@ -81,6 +81,15 @@ class ServerTest(unittest.TestCase):
         tail = json.loads(self.req(f"/api/job?since={job['offset']}")[1])
         self.assertEqual(tail["log"], "")
 
+    def test_uppercase_extension_is_listed(self):
+        # Scanners often write "Scan.PDF"; the upload accepts it, so the list must show it.
+        self.assertEqual(self.req("/api/upload?name=Scan.PDF", b"%PDF-1.4 s")[0], 200)
+        names = [f["name"] for f in json.loads(self.req("/api/files")[1])]
+        self.assertIn("Scan.PDF", names)
+
+    def test_bad_since_param(self):
+        self.assertEqual(self.req("/api/job?since=abc")[0], 200)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -25,6 +25,7 @@ import extractor
 import gemini
 import preflight
 import processor
+import state
 
 
 def _obtain_api_key() -> str:
@@ -51,19 +52,25 @@ def _obtain_api_key() -> str:
 def _find_pdf(explicit: str | None) -> Path:
     if explicit:
         candidate = Path(explicit)
-        if not candidate.is_absolute():
+        if not candidate.is_file():  # not a path from the cwd → a name inside input/
             candidate = config.INPUT_DIR / explicit
-        if not candidate.exists():
+        if not candidate.is_file():
             sys.exit(f"Input PDF not found: {candidate}")
         return candidate
 
     config.INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pdfs = sorted(config.INPUT_DIR.glob("*.pdf"))
+    pdfs = sorted(p for p in config.INPUT_DIR.iterdir() if p.suffix.lower() == ".pdf")
     if not pdfs:
         sys.exit(f"No PDF in {config.INPUT_DIR}. Drop your exam paper there and re-run.")
     if len(pdfs) > 1:
         print(f"Multiple PDFs found; using the first: {pdfs[0].name}")
     return pdfs[0]
+
+
+def _source_changed(pdf_path: Path, original_name: str) -> bool:
+    """True if the cache was built from a different file of the same name."""
+    cached = state.load_state(original_name).get("source_sha256")
+    return cached is not None and cached != state.file_sha256(pdf_path)
 
 
 def main() -> None:
@@ -94,6 +101,9 @@ def main() -> None:
     original_name = pdf_path.stem
     print(f"=== Pipeline for '{pdf_path.name}' ===")
     print(f"  Model budget today →  {gemini.budget_summary()}\n")
+    if not args.force and _source_changed(pdf_path, original_name):
+        print("  ↻ This PDF differs from the cached run of the same name — starting fresh.\n")
+        args.force = True
 
     try:
         extractor.run(pdf_path, original_name, force=args.force)   # Phase 2 (1 request)
@@ -105,6 +115,8 @@ def main() -> None:
                 print(f"\n⚠ WARNING: Semantic Evaluation Failed (Score: {eval_result.get('score', 0.0):.1%}). Hallucination risk detected!")
     except gemini.BudgetExceeded as exc:
         sys.exit(f"\n⏸ {exc}")
+    except RuntimeError as exc:  # phase-level failures carry a user-facing message
+        sys.exit(f"\n✗ {exc}\n  Completed steps are cached; fix the cause and re-run.")
     except KeyboardInterrupt:
         sys.exit("\nInterrupted — progress is cached; re-run to resume.")
 

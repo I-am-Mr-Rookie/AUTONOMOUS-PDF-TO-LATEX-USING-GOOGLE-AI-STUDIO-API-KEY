@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import gemini
-from state import has_milestone, load_state, save_state
+from state import file_sha256, has_milestone, load_state, save_state
 
 EXTRACTION_KEY = "extraction_result"
 
@@ -117,6 +117,7 @@ def run(pdf_path: Path, original_name: str, force: bool = False) -> dict[str, An
 
     state[EXTRACTION_KEY] = result
     state["source_pdf"] = pdf_path.name
+    state["source_sha256"] = file_sha256(pdf_path)
     save_state(original_name, state)
 
     blocks = result.get("blocks", [])

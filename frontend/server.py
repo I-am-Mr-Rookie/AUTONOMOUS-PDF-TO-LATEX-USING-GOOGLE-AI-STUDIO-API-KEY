@@ -40,7 +40,7 @@ def safe_pdf_name(name: str) -> str | None:
 
 def list_files() -> list[dict]:
     rows = []
-    for pdf in sorted(INPUT_DIR.glob("*.pdf")):
+    for pdf in sorted(p for p in INPUT_DIR.glob("*") if p.suffix.lower() == ".pdf"):
         out = OUTPUT_DIR / f"{pdf.stem}_LaTeX_compiled.pdf"
         tex = out.with_suffix(".tex")
         rows.append({
@@ -112,7 +112,8 @@ class Handler(BaseHTTPRequestHandler):
         elif url.path == "/api/files":
             self._json(list_files())
         elif url.path == "/api/job":
-            since = int(parse_qs(url.query).get("since", ["0"])[0] or 0)
+            since = parse_qs(url.query).get("since", ["0"])[0]
+            since = int(since) if since.isdigit() else 0
             with _lock:
                 self._json({**_job, "log": _job["log"][since:], "offset": len(_job["log"])})
         elif url.path.startswith("/output/"):

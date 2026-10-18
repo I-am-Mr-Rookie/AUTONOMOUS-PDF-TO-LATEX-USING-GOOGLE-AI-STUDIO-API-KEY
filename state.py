@@ -7,6 +7,7 @@ interrupted run cannot leave a half-written, unparseable state file behind.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -45,6 +46,16 @@ def save_state(original_name: str, state: dict[str, Any]) -> None:
         except OSError:
             pass
         raise
+
+
+def file_sha256(path: Path) -> str:
+    """Content fingerprint of the source PDF: the cache is keyed by filename, so this
+    detects a different file saved under the same name."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def has_milestone(state: dict[str, Any], key: str) -> bool:

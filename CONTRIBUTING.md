@@ -21,6 +21,11 @@ Please maintain a respectful, welcoming, and collaborative environment for all c
    ```bash
    python main.py --preflight-only
    ```
+   and that the offline tests pass:
+   ```bash
+   python -m unittest discover tests
+   python -m unittest frontend/test_server.py
+   ```
 3. Maintain existing architecture conventions:
    - **Cache-first state machine**: Preserve `cache/[Original_Name]_state.json` updates and atomic writes.
    - **Zero-API offline steps**: Ensure Phase 1 (preflight) and Phase 3 (image slicing) consume zero API requests.

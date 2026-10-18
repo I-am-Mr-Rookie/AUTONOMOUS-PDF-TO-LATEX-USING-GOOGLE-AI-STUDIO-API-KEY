@@ -69,6 +69,11 @@ def _gen_prompt(extraction: dict[str, Any], crops: list[dict[str, Any]]) -> str:
 
 def _clean(text: str) -> str:
     text = (text or "").strip()
+    # Schema-less models (Gemma) may wrap the source in prose and/or fences; keep only the
+    # document. Slicing (not fence-matching) keeps ``` inside lstlisting bodies intact.
+    start, end = text.find("\\documentclass"), text.rfind("\\end{document}")
+    if start != -1 and end > start:
+        return text[start : end + len("\\end{document}")]
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
